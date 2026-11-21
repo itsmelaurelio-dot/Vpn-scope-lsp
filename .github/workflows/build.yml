@@ -1,8 +1,17 @@
 name: Build APK
 
 on:
-  push:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+  release:
+    types: [published]
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -10,16 +19,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Jalan otomatis hanya kalau ada VpnPerApp.zip di repo (misalnya saat upload versi baru).
+      - name: Ekstrak sumber dari VpnPerApp.zip
+        if: ${{ github.event_name != 'release' && hashFiles('VpnPerApp.zip') != '' }}
+        run: |
+          unzip -q VpnPerApp.zip
+          cp -r VpnPerApp/. .
+          rm -rf VpnPerApp VpnPerApp.zip README.txt
+          printf 'build/\n.gradle/\nlocal.properties\n*.apk\n.idea/\n' > .gitignore
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "Ekstrak sumber proyek dari VpnPerApp.zip"
+          git push
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      - name: Ekstrak proyek
-        run: unzip -q VpnPerApp.zip
-
       - name: Buat Config.java dari allowed.txt
         run: |
+          [ -f allowed.txt ] || : > allowed.txt
           {
             echo 'package com.hanaka.vpnperapp;'
             echo 'public final class Config {'
@@ -32,18 +53,35 @@ jobs:
             echo '    };'
             echo '    public static final String FALLBACK_PKG = "com.android.shell";'
             echo '}'
-          } > VpnPerApp/app/src/main/java/com/hanaka/vpnperapp/Config.java
+          } > app/src/main/java/com/hanaka/vpnperapp/Config.java
 
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.7
 
       - name: Build debug APK
-        working-directory: VpnPerApp
         run: gradle assembleDebug --stacktrace
+
+      - name: Beri nama APK
+        id: apk
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          NAME="VpnPerApp-${TAG:-dev}.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "$NAME"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v4
         with:
           name: VpnPerApp-apk
-          path: VpnPerApp/app/build/outputs/apk/debug/*.apk
+          path: ${{ steps.apk.outputs.name }}
           if-no-files-found: error
+
+      - name: Lampirkan APK ke halaman Release
+        if: ${{ github.event_name == 'release' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+          APK: ${{ steps.apk.outputs.name }}
+        run: gh release upload "$TAG" "$APK" --clobber --repo "$GITHUB_REPOSITORY"
+        

@@ -1,0 +1,49 @@
+name: Build APK
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Ekstrak proyek
+        run: unzip -q VpnPerApp.zip
+
+      - name: Buat Config.java dari allowed.txt
+        run: |
+          {
+            echo 'package com.hanaka.vpnperapp;'
+            echo 'public final class Config {'
+            echo '    private Config() {}'
+            echo '    public static final String[] ALLOWED = {'
+            tr -d '\r' < allowed.txt \
+              | sed 's/#.*//;s/^[[:space:]]*//;s/[[:space:]]*$//' \
+              | grep -E '^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$' \
+              | sed 's/.*/        "&",/' || true
+            echo '    };'
+            echo '    public static final String FALLBACK_PKG = "com.android.shell";'
+            echo '}'
+          } > VpnPerApp/app/src/main/java/com/hanaka/vpnperapp/Config.java
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.7
+
+      - name: Build debug APK
+        working-directory: VpnPerApp
+        run: gradle assembleDebug --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VpnPerApp-apk
+          path: VpnPerApp/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error

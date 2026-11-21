@@ -44,7 +44,7 @@ Android hanya mengizinkan VPN memakai **allow list** *atau* **deny list** per ap
 
 - **Baru diuji dengan satu app VPN** di Vector. Beberapa app VPN membuat tunnel lewat kode native (bukan lewat `VpnService.Builder` Java), dan itu **tidak akan kena** hook ini.
 - Pilihan dari UI dibagikan ke hook lewat fitur *New XSharedPreferences* milik LSPosed. Fitur itu **sudah deprecated dan dijadwalkan dihapus** di LSPosed, dan dukungan di Vector belum pasti. Kalau gagal, app menampilkan pesan merah dan hook otomatis memakai daftar bawaan dari `allowed.txt` (lihat bagian build).
-- APK di Releases ditandatangani dengan **debug key** yang kuncinya ada di repo ini. Ini cukup untuk pemakaian pribadi, tapi bukan jaminan keaslian. Kalau mau lebih aman, build sendiri dari sumber.
+- APK resmi di Releases ditandatangani dengan kunci pribadi yang disimpan di GitHub Secrets. Kalau kamu fork repo ini dan build sendiri, hasilnya memakai kunci debug bawaan repo dan akan ditandatangani ulang, jadi tidak bisa dipasang sebagai update dari APK resmi
 - Dibuat sebagai proyek pribadi. **Tanpa garansi.** Memakai Xposed/root ada risikonya, jadi pakai dengan hati-hati.
 
 ## Build sendiri
